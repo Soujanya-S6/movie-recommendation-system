@@ -63,13 +63,9 @@ def create_model(df):
         df["clean_text"]
     )
 
-    similarity_matrix = cosine_similarity(
-        tfidf_matrix
-    )
+    return tfidf_matrix
 
-    return similarity_matrix
-
-def recommend(item_name, df, similarity_matrix, top_n=5):
+def recommend(item_name, df, tfidf_matrix, top_n=5):
 
     indices = pd.Series(
         df.index,
@@ -81,32 +77,27 @@ def recommend(item_name, df, similarity_matrix, top_n=5):
 
     idx = indices[item_name]
 
-    similarity_scores = list(
-        enumerate(similarity_matrix[idx])
-    )
+    similarity_scores = cosine_similarity(
+        tfidf_matrix[idx],
+        tfidf_matrix
+    ).flatten()
 
-    similarity_scores = sorted(
-        similarity_scores,
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    similarity_scores = [
-        item
-        for item in similarity_scores
-        if item[0] != idx
-    ]
-
-    top_movies = similarity_scores[:top_n]
+    similar_indices = similarity_scores.argsort()[::-1]
 
     recommendations = []
 
-    for movie_index, score in top_movies:
+    for movie_index in similar_indices:
+
+        if movie_index == idx:
+            continue
 
         recommendations.append({
             "title": df.iloc[movie_index]["title"],
-            "score": score
+            "score": similarity_scores[movie_index]
         })
+
+        if len(recommendations) == top_n:
+            break
 
     return recommendations
 
@@ -115,7 +106,7 @@ st.title("Movie Recommendation System")
 
 df = load_data()
 
-similarity_matrix = create_model(df)
+tfidf_matrix = create_model(df)
 movie_list = sorted(
     df["title"].dropna().unique()
 )
@@ -131,7 +122,7 @@ if st.button("Get Recommendations"):
     recommendations = recommend(
         selected_movie,
         df,
-        similarity_matrix,
+        tfidf_matrix,
         5
     )
 
